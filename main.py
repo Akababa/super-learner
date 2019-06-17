@@ -2,6 +2,19 @@ from sklearn import datasets
 from sklearn.model_selection import train_test_split
 
 from base import SuperLearner
+from sklearn import datasets, linear_model, neighbors, svm, ensemble
+
+ols = linear_model.LinearRegression()
+elnet = linear_model.ElasticNetCV(rho=.1)
+ridge = linear_model.RidgeCV()
+lars = linear_model.LarsCV()
+lasso = linear_model.LassoCV()
+nn = neighbors.KNeighborsRegressor()
+svm1 = svm.SVR(scale_C=True)
+svm2 = svm.SVR(kernel='poly', scale_C=True)
+rf = ensemble.RandomForestRegressor(n_estimators=10, random_state=1)
+model_lib = [ols, elnet, ridge, lars, lasso, nn, svm1, svm2, rf]
+model_names = ["OLS", "ElasticNet", "Ridge", "LARS", "LASSO", "kNN", "SVM rbf", "SVM poly", 'RF']
 
 iris = datasets.load_iris()
 
