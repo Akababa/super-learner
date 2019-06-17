@@ -5,16 +5,16 @@ from base import SuperLearner
 from sklearn import datasets, linear_model, neighbors, svm, ensemble
 
 ols = linear_model.LinearRegression()
-elnet = linear_model.ElasticNetCV(rho=.1)
+elnet = linear_model.ElasticNetCV(l1_ratio=0.5)
 ridge = linear_model.RidgeCV()
 lars = linear_model.LarsCV()
 lasso = linear_model.LassoCV()
 nn = neighbors.KNeighborsRegressor()
-svm1 = svm.SVR(scale_C=True)
-svm2 = svm.SVR(kernel='poly', scale_C=True)
-rf = ensemble.RandomForestRegressor(n_estimators=10, random_state=1)
-model_lib = [ols, elnet, ridge, lars, lasso, nn, svm1, svm2, rf]
-model_names = ["OLS", "ElasticNet", "Ridge", "LARS", "LASSO", "kNN", "SVM rbf", "SVM poly", 'RF']
+svm1 = svm.SVR(kernel='linear', C=10, gamma='auto')
+svm2 = svm.SVR(kernel='poly', C=10, gamma='auto')
+rf = ensemble.RandomForestRegressor(n_estimators=20, random_state=1)
+model_lib = [ols, rf ,elnet, ridge, lars, lasso, nn, svm1, svm2]
+model_names = ["OLS", "RF", "ElasticNet", "Ridge", "LARS", "LASSO", "kNN", "SVM rbf", "SVM poly"]
 
 iris = datasets.load_iris()
 
