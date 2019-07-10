@@ -2,6 +2,7 @@ from sklearn import datasets, linear_model, neighbors, svm, ensemble
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import KFold
 from base import SuperLearner
+from base import BMA
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -28,6 +29,10 @@ X_train, X_test, y_train, y_test = train_test_split(
 clf = SuperLearner(cand_learners=model_lib[0:8],
                   meta_learner=meta_learner,
                    V=v_folds).fit(X_train, y_train)
+bma = BMA([ols, ridge])
+bma.fit(X_train, y_train)
+print(bma.weights())
+
 print(clf.score(X_test, y_test))
 from sklearn.model_selection import cross_val_score
 

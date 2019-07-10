@@ -49,7 +49,7 @@ class SuperLearner(BaseEstimator, RegressorMixin):
 class BMA():
     def __init__(self, cand_learners=[LinearRegression()]):
         self.cand_learners = cand_learners
-        self.weights = None
+        self.weights_ = None
 
     def fit(self, X, y):
         X, y = check_X_y(X, y)
@@ -62,11 +62,12 @@ class BMA():
             cand.fit(X, y)
             BIC[i] = np.log(k*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
 
-        self.weights_ = np.exp(-0.5 * BIC) / (sum(-0.5 * BIC))
+        self.weights_ = np.exp(-0.5 * BIC) / (sum(np.exp(-0.5 * BIC)))
         return self
 
     def weights(self):
-       return self.weights
+        print([type(x).__name__ for x in self.cand_learners_])
+        return self.weights_
 
 
 
