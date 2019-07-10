@@ -6,6 +6,8 @@ from sklearn.model_selection import cross_val_predict
 from sklearn.utils import check_X_y, check_array
 from sklearn.utils.estimator_checks import check_estimator
 from sklearn.utils.validation import check_is_fitted
+from sklearn.metrics import mean_squared_error
+
 
 
 class SuperLearner(BaseEstimator, RegressorMixin):
@@ -42,6 +44,25 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         Z = [cl.predict(X) for cl in self.cand_learners_]
         Z = np.transpose(Z)
         return self.meta_learner_.predict(Z)
+
+
+class BMA():
+    def __init__(self, cand_learners=[LinearRegression()]):
+        self.cand_learners = cand_learners
+        self.weights = None
+
+    def fit(self, X, y):
+        X, y = check_X_y(X, y)
+        n = len(X)
+        self.cand_learners_ = [clone(c) for c in self.cand_learners]
+        BIC = np.zeros(len(self.cand_learners))
+
+        self.weights_ = np.exp(-0.5 * BIC) / (sum(-0.5 * BIC))
+        return self
+
+    def weights(self):
+       return self.weights
+
 
 
 if __name__ == "__main__":
