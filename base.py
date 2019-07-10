@@ -54,8 +54,13 @@ class BMA():
     def fit(self, X, y):
         X, y = check_X_y(X, y)
         n = len(X)
+        p = len(np.transpose(X))
         self.cand_learners_ = [clone(c) for c in self.cand_learners]
-        BIC = np.zeros(len(self.cand_learners))
+        k = len(self.cand_learners_)
+        BIC = np.zeros(k)
+        for cand, i in zip(self.cand_learners_, range(k)):
+            cand.fit(X, y)
+            BIC[i] = np.log(mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
 
         self.weights_ = np.exp(-0.5 * BIC) / (sum(-0.5 * BIC))
         return self
