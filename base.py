@@ -60,7 +60,7 @@ class BMA():
         BIC = np.zeros(k)
         for cand, i in zip(self.cand_learners_, range(k)):
             cand.fit(X, y)
-            BIC[i] = np.log(mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
+            BIC[i] = np.log(k*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
 
         self.weights_ = np.exp(-0.5 * BIC) / (sum(-0.5 * BIC))
         return self
