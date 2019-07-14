@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.stats import entropy
 from sklearn.base import BaseEstimator, RegressorMixin, clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
@@ -46,7 +47,7 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         return self.meta_learner_.predict(Z)
 
 
-class BMA():
+class BMA(BaseEstimator, RegressorMixin):
     def __init__(self, cand_learners=[LinearRegression()]):
         self.cand_learners = cand_learners
         self.weights_ = None
@@ -60,7 +61,8 @@ class BMA():
         BIC = np.zeros(k)
         for cand, i in zip(self.cand_learners_, range(k)):
             cand.fit(X, y)
-            BIC[i] = np.log(k*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
+            BIC[i] = n*entropy(y, cand.predict(X))
+            #BIC[i] = np.log(n*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
 
         self.weights_ = np.exp(-0.5 * BIC) / (sum(np.exp(-0.5 * BIC)))
         return self
@@ -69,6 +71,11 @@ class BMA():
         print([type(x).__name__ for x in self.cand_learners_])
         return self.weights_
 
+    def predict(self, X):
+        check_is_fitted(self, 'cand_learners')
+        X = check_array(X)
+        y_hat = np.transpose([cl.predict(X) for cl in self.cand_learners_])
+        return np.sum(y_hat*self.weights_, axis=1)
 
 
 if __name__ == "__main__":
