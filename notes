@@ -1,0 +1,19 @@
+- Propose potential improvements of the method
+- Identify possible issues and/or limitations of the proposed method 
+- Suggest possible ways to address the issues
+- Find possible errors in the paper
+
+
+Notes
+
+- The results of the paper's simulation studies are unreliable because the data sets chosen were the ones the Super Learner performed the best on (minimized relative MSPE). The authors might have ran other simulations but did not include these since the results contradicted their claim. Also, the true data generating models in the simulation studies are known, which ...
+
+- (Support this by running simulations that use a variety of simulated data sets, which show that the Super Learner does not always perform the best)
+
+- Once real data sets were used (the Diabetes and HIV data sets), other models performed as well as the Super Learner (criteria: relative CV risk)
+
+- (Find real data sets that show that the Super Learner does not always perform the best)
+
+- Based on our results, is it worth implementing the Super Learner when simpler models are sufficient?
+
+- Page 7: ``Since the candidate learners are all trying to predict the same outcome $ Y $, there is a potential for collinearity in the predicted $ Z $ data set". Possible solutions for this?
