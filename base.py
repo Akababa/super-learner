@@ -1,13 +1,13 @@
 import numpy as np
+import pandas as pd
 from sklearn.base import BaseEstimator, RegressorMixin, clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_predict
 from sklearn.utils import check_X_y, check_array
 from sklearn.utils.estimator_checks import check_estimator
 from sklearn.utils.validation import check_is_fitted
-from sklearn.metrics import mean_squared_error
-
 
 
 class SuperLearner(BaseEstimator, RegressorMixin):
@@ -45,6 +45,27 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         Z = np.transpose(Z)
         return self.meta_learner_.predict(Z)
 
+    def mse(self, X, y):
+        X, y = check_X_y(X, y)
+        return mean_squared_error(y, self.predict(X))
+
+    def debug(self, X1, y1, X2, y2):
+        X1, y1 = check_X_y(X1, y1)
+        X2, y2 = check_X_y(X2, y2)
+        stuff = []
+        for cl in self.cand_learners_:
+            stuff.append([type(cl).__name__, mean_squared_error(cl.predict(X1), y1),
+                          mean_squared_error(cl.predict(X2), y2)])
+
+        stuff.append(["meta", mean_squared_error(self.predict(X1), y1),
+                      mean_squared_error(self.predict(X2), y2)])
+
+        df = pd.DataFrame(data=stuff, columns=["name", "training mse", "testing mse"])
+        if type(self.meta_learner_).__name__ == "LinearRegression":
+            df["coef"] = self.meta_learner_.coef_.tolist() + [None]
+
+        return df
+
 
 class BMA():
     def __init__(self, cand_learners=[LinearRegression()]):
@@ -60,7 +81,7 @@ class BMA():
         BIC = np.zeros(k)
         for cand, i in zip(self.cand_learners_, range(k)):
             cand.fit(X, y)
-            BIC[i] = np.log(k*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
+            BIC[i] = np.log(k * mean_squared_error(y, cand.predict(X))) + (p + 2) * np.log(n)
 
         self.weights_ = np.exp(-0.5 * BIC) / (sum(np.exp(-0.5 * BIC)))
         return self
@@ -68,7 +89,6 @@ class BMA():
     def weights(self):
         print([type(x).__name__ for x in self.cand_learners_])
         return self.weights_
-
 
 
 if __name__ == "__main__":
