@@ -28,6 +28,7 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         Z = [cross_val_predict(cl, X, y, groups=folds, cv=self.V) for cl in self.cand_learners_]
         Z = np.transpose(Z)
         Z = check_array(Z)
+        self.Z_train_cv_ = Z
         # step 4: train meta learner
         self.meta_learner_ = clone(self.meta_learner)
         self.meta_learner_.fit(Z, y)
@@ -45,24 +46,36 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         Z = np.transpose(Z)
         return self.meta_learner_.predict(Z)
 
-    def mse(self, X, y):
-        X, y = check_X_y(X, y)
-        return mean_squared_error(y, self.predict(X))
-
-    def debug(self, X1, y1, X2, y2):
+    def debug(self, X1, y1, X2=None, y2=None):
+        """
+        Fits on X1, y1 and predicts on X2, y2 and returns a DataFrame of useful info.
+        X2, y2 optional.
+        """
         X1, y1 = check_X_y(X1, y1)
-        X2, y2 = check_X_y(X2, y2)
+
+        test = X2 is not None or y2 is not None
+        if test:
+            X2, y2 = check_X_y(X2, y2)
+
+        self.fit(X1, y1)
+
         stuff = []
-        for cl in self.cand_learners_:
-            stuff.append([type(cl).__name__, mean_squared_error(cl.predict(X1), y1),
-                          mean_squared_error(cl.predict(X2), y2)])
+        for cl, Z_cv in zip(self.cand_learners_, np.transpose(self.Z_train_cv_)):
+            stuff.append([type(cl).__name__,
+                          mean_squared_error(cl.predict(X1), y1),
+                          mean_squared_error(Z_cv, y1)]
+                         + ([mean_squared_error(cl.predict(X2), y2)] if test else []))
 
-        stuff.append(["meta", mean_squared_error(self.predict(X1), y1),
-                      mean_squared_error(self.predict(X2), y2)])
+        stuff.append([f"Meta ({type(self.meta_learner_).__name__})",
+                      mean_squared_error(self.predict(X1), y1),
+                      mean_squared_error(self.meta_learner_.predict(self.Z_train_cv_), y1)]
+                     + ([mean_squared_error(self.predict(X2), y2)] if test else []))
 
-        df = pd.DataFrame(data=stuff, columns=["name", "training mse", "testing mse"])
-        if type(self.meta_learner_).__name__ == "LinearRegression":
-            df["coef"] = self.meta_learner_.coef_.tolist() + [None]
+        df = pd.DataFrame(data=stuff, columns=["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if test else []))
+        try:
+            df["Coefs"] = self.meta_learner_.coef_.tolist() + [None]
+        except:  # no coefs
+            pass
 
         return df
 
