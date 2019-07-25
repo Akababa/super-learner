@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.stats import entropy
+import scipy as sp
 from sklearn.base import BaseEstimator, RegressorMixin, clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
@@ -61,7 +61,9 @@ class BMA(BaseEstimator, RegressorMixin):
         BIC = np.zeros(k)
         for cand, i in zip(self.cand_learners_, range(k)):
             cand.fit(X, y)
-            BIC[i] = n*entropy(y, cand.predict(X))
+            mse_eps = mean_squared_error(y, cand.predict(X))
+            ll_val = -n*np.log(2*np.pi*mse_eps)/2 - n*mse_eps/(2*mse_eps)
+            BIC[i] = ll_val + (p+2)*np.log(n)
             #BIC[i] = np.log(n*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
 
         self.weights_ = np.exp(-0.5 * BIC) / (sum(np.exp(-0.5 * BIC)))
