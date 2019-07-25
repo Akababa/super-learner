@@ -110,8 +110,8 @@ class BMA(BaseEstimator, RegressorMixin):
         BIC = np.zeros(k)
         for cand, i in zip(self.cand_learners_, range(k)):
             cand.fit(X, y)
-            mse_eps = mean_squared_error(y, cand.predict(X))
-            ll_val = -n*np.log(2*np.pi*mse_eps)/2 - n*mse_eps/(2*mse_eps)
+            var_eps = np.var(y-cand.predict(X))
+            ll_val = -n*np.log(2*np.pi*var_eps)/2 - n/2
             BIC[i] = ll_val + (p+2)*np.log(n)
             #BIC[i] = np.log(n*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
 
