@@ -1,15 +1,13 @@
 import numpy as np
 import pandas as pd
-import scipy as sp
 from sklearn.base import BaseEstimator, RegressorMixin, clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import cross_val_predict
 from sklearn.utils import check_X_y, check_array
 from sklearn.utils.estimator_checks import check_estimator
 from sklearn.utils.validation import check_is_fitted
-from sklearn.metrics import mean_squared_error
-
 
 
 class SuperLearner(BaseEstimator, RegressorMixin):
@@ -30,6 +28,7 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         Z = [cross_val_predict(cl, X, y, groups=folds, cv=self.V) for cl in self.cand_learners_]
         Z = np.transpose(Z)
         Z = check_array(Z)
+        self.Z_train_cv_ = Z
         # step 4: train meta learner
         self.meta_learner_ = clone(self.meta_learner)
         self.meta_learner_.fit(Z, y)
@@ -51,50 +50,39 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         X, y = check_X_y(X, y)
         return mean_squared_error(y, self.predict(X))
 
-    def debug(self, X1, y1, X2, y2):
-        def debug(self, X1, y1, X2=None, y2=None):
-            """
-            Fits on X1, y1 and predicts on X2, y2 and returns a DataFrame of useful info.
-            X2, y2 optional.
-            """
-            X1, y1 = check_X_y(X1, y1)
+    def debug(self, X1, y1, X2=None, y2=None):
+        """
+        Fits on X1, y1 and predicts on X2, y2 and returns a DataFrame of useful info.
+        X2, y2 optional.
+        """
+        X1, y1 = check_X_y(X1, y1)
+
+        test = X2 is not None or y2 is not None
+        if test:
             X2, y2 = check_X_y(X2, y2)
-            stuff = []
-            for cl in self.cand_learners_:
-                stuff.append([type(cl).__name__, mean_squared_error(cl.predict(X1), y1),
-                              mean_squared_error(cl.predict(X2), y2)])
 
-            stuff.append(["meta", mean_squared_error(self.predict(X1), y1),
-                          mean_squared_error(self.predict(X2), y2)])
-            test = X2 is not None or y2 is not None
-            if test:
-                X2, y2 = check_X_y(X2, y2)
+        self.fit(X1, y1)
 
-            df = pd.DataFrame(data=stuff, columns=["name", "training mse", "testing mse"])
-            if type(self.meta_learner_).__name__ == "LinearRegression":
-                df["coef"] = self.meta_learner_.coef_.tolist() + [None]
-            self.fit(X1, y1)
+        stuff = []
+        for cl, Z_cv in zip(self.cand_learners_, np.transpose(self.Z_train_cv_)):
+            stuff.append([type(cl).__name__,
+                          mean_squared_error(cl.predict(X1), y1),
+                          mean_squared_error(Z_cv, y1)]
+                         + ([mean_squared_error(cl.predict(X2), y2)] if test else []))
 
-            stuff = []
-            for cl, Z_cv in zip(self.cand_learners_, np.transpose(self.Z_train_cv_)):
-                stuff.append([type(cl).__name__,
-                              mean_squared_error(cl.predict(X1), y1),
-                              mean_squared_error(Z_cv, y1)]
-                             + ([mean_squared_error(cl.predict(X2), y2)] if test else []))
+        stuff.append([f"Meta ({type(self.meta_learner_).__name__})",
+                      mean_squared_error(self.predict(X1), y1),
+                      mean_squared_error(self.meta_learner_.predict(self.Z_train_cv_), y1)]
+                     + ([mean_squared_error(self.predict(X2), y2)] if test else []))
 
-            stuff.append([f"Meta ({type(self.meta_learner_).__name__})",
-                          mean_squared_error(self.predict(X1), y1),
-                          mean_squared_error(self.meta_learner_.predict(self.Z_train_cv_), y1)]
-                         + ([mean_squared_error(self.predict(X2), y2)] if test else []))
+        df = pd.DataFrame(data=stuff, columns=["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if test else []))
+        try:
+            df["Coefs"] = self.meta_learner_.coef_.tolist() + [None]
+        except:  # no coefs
+            pass
 
-            df = pd.DataFrame(data=stuff,
-                              columns=["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if test else []))
-            try:
-                df["Coefs"] = self.meta_learner_.coef_.tolist() + [None]
-            except:  # no coefs
-                pass
+        return df
 
-            return df
 
 class BMA(BaseEstimator, RegressorMixin):
     def __init__(self, cand_learners=[LinearRegression()]):
@@ -110,10 +98,10 @@ class BMA(BaseEstimator, RegressorMixin):
         BIC = np.zeros(k)
         for cand, i in zip(self.cand_learners_, range(k)):
             cand.fit(X, y)
-            var_eps = np.var(y-cand.predict(X))
-            ll_val = -n*np.log(2*np.pi*var_eps)/2 - n/2
-            BIC[i] = ll_val + (p+2)*np.log(n)
-            #BIC[i] = np.log(n*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
+            var_eps = np.var(y - cand.predict(X))
+            ll_val = -n * np.log(2 * np.pi * var_eps) / 2 - n / 2
+            BIC[i] = ll_val + (p + 2) * np.log(n)
+            # BIC[i] = np.log(n*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
 
         self.weights_ = np.exp(-0.5 * BIC) / (sum(np.exp(-0.5 * BIC)))
         return self
@@ -126,7 +114,7 @@ class BMA(BaseEstimator, RegressorMixin):
         check_is_fitted(self, 'cand_learners')
         X = check_array(X)
         y_hat = np.transpose([cl.predict(X) for cl in self.cand_learners_])
-        return np.sum(y_hat*self.weights_, axis=1)
+        return np.sum(y_hat * self.weights_, axis=1)
 
 
 if __name__ == "__main__":
