@@ -36,6 +36,7 @@ bma = BMA([ols, elnet, ridge, lars, lasso])
 bma.fit(X_train, y_train)
 print(bma.weights())
 print(bma.score(X_test, y_test))
+norm_pval = bma.norm_test(pval=True)
 
 print(clf.score(X_test, y_test))
 from sklearn.model_selection import cross_val_score
