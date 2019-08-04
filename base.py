@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy import stats
 from sklearn.base import BaseEstimator, RegressorMixin, clone
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
@@ -88,6 +89,7 @@ class BMA(BaseEstimator, RegressorMixin):
     def __init__(self, cand_learners=[LinearRegression()]):
         self.cand_learners = cand_learners
         self.weights_ = None
+        self.norm_test_ = None
 
     def fit(self, X, y):
         X, y = check_X_y(X, y)
@@ -96,21 +98,31 @@ class BMA(BaseEstimator, RegressorMixin):
         self.cand_learners_ = [clone(c) for c in self.cand_learners]
         k = len(self.cand_learners_)
         BIC = np.zeros(k)
+        norm_test = np.zeros((k,2))
         for cand, i in zip(self.cand_learners_, range(k)):
             cand.fit(X, y)
             # https://www.ssc.wisc.edu/~bhansen/718/NonParametrics15.pdf
-            var_eps = np.var(y - cand.predict(X)) # this is sigma^2
+            eps = y - cand.predict(X)
+            var_eps = np.var(eps) # this is sigma^2
+            norm_test[i,] = stats.shapiro(eps)
             ll_val = -n * np.log(2 * np.pi * var_eps) / 2 - n / 2 # simplified log likelihood
             BIC[i] = 2*ll_val + (p + 2) * np.log(n)
-            # BIC[i] = np.log(n*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
+
         # using log-sum-exp rule: https://www.xarg.org/2016/06/the-log-sum-exp-trick-in-machine-learning/
-        logsum = max(-0.5*BIC) + np.log(np.sum(np.exp(-0.5*BIC-max(-0.5*BIC))))
-        self.weights_ = np.exp(-0.5 * BIC-logsum) # weighting formula
+        logsum = max(-0.5*BIC) + np.log(np.sum(np.exp(-0.5*BIC - max(-0.5*BIC))))
+        self.weights_ = np.exp(-0.5*BIC - logsum) # weighting formula
+        self.norm_test_ = norm_test
         return self
 
     def weights(self):
         print([type(x).__name__ for x in self.cand_learners_])
         return self.weights_
+
+    def norm_test(self, pval=True):
+        if pval:
+            return self.norm_test_[:,1]
+        else:
+            return self.norm_test_[:,0]
 
     def predict(self, X):
         check_is_fitted(self, 'cand_learners')
