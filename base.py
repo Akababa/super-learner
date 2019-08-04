@@ -103,8 +103,9 @@ class BMA(BaseEstimator, RegressorMixin):
             ll_val = -n * np.log(2 * np.pi * var_eps) / 2 - n / 2 # simplified log likelihood
             BIC[i] = 2*ll_val + (p + 2) * np.log(n)
             # BIC[i] = np.log(n*mean_squared_error(y, cand.predict(X))) + (p+2)*np.log(n)
-        BIC = BIC - np.min(BIC)
-        self.weights_ = np.exp(-0.5 * BIC) / (sum(np.exp(-0.5 * BIC))) # weighting formula
+        # using log-sum-exp rule: https://www.xarg.org/2016/06/the-log-sum-exp-trick-in-machine-learning/
+        logsum = max(-0.5*BIC) + np.log(np.sum(np.exp(-0.5*BIC-max(-0.5*BIC))))
+        self.weights_ = np.exp(-0.5 * BIC-logsum) # weighting formula
         return self
 
     def weights(self):
