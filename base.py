@@ -19,24 +19,32 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         self.meta_learner = meta_learner
         self.V = V
 
-    def fit(self, X, y):
+    def fit_cands(self, X, y):
         X, y = check_X_y(X, y)
         # step 1: split data into V blocks
-        n = len(X)
-        folds = [i % self.V for i in range(n)]
+        folds = [i % self.V for i in range(len(X))]
         # step 2-3: train each candidate learner and get CV predictions
         self.cand_learners_ = [clone(c) for c in self.cand_learners]
         Z = [cross_val_predict(cl, X, y, groups=folds, cv=self.V) for cl in self.cand_learners_]
         Z = np.transpose(Z)
-        Z = check_array(Z)
         self.Z_train_cv_ = Z
-        # step 4: train meta learner
-        self.meta_learner_ = clone(self.meta_learner)
-        self.meta_learner_.fit(Z, y)
-
         # step 0: fit candidate learners on whole dataset (have to do this after)
         for cand in self.cand_learners_:
             cand.fit(X, y)
+
+        return Z
+
+    def fit_meta(self, Z, y):
+        Z = check_array(Z)
+        self.meta_learner_ = clone(self.meta_learner)
+        self.meta_learner_.fit(Z, y)
+
+    def fit(self, X, y):
+        # steps 0-3: fit candidate learners
+        Z = self.fit_cands(X, y)
+
+        # step 4: fit meta learner
+        self.fit_meta(Z, y)
 
         return self
 
@@ -51,7 +59,22 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         X, y = check_X_y(X, y)
         return mean_squared_error(y, self.predict(X))
 
-    def debug(self, X1, y1, X2=None, y2=None):
+    def get_cand_stats(self, X1, y1, X2=None, y2=None):
+        stuff = []
+        for cl, Z_cv in zip(self.cand_learners_, np.transpose(self.Z_train_cv_)):
+            stuff.append([type(cl).__name__,
+                          mean_squared_error(cl.predict(X1), y1),
+                          mean_squared_error(Z_cv, y1)]
+                         + ([mean_squared_error(cl.predict(X2), y2)] if X2 is not None else []))
+        return stuff
+
+    def get_meta_stats(self, X1, y1, X2=None, y2=None):
+        return [f"Meta ({type(self.meta_learner_).__name__})",
+                mean_squared_error(self.predict(X1), y1),
+                mean_squared_error(self.meta_learner_.predict(self.Z_train_cv_), y1)] \
+               + ([mean_squared_error(self.predict(X2), y2)] if X2 is not None else [])
+
+    def debug(self, X1, y1, X2=None, y2=None, skip_fit=False):
         """
         Fits on X1, y1 and predicts on X2, y2 and returns a DataFrame of useful info.
         X2, y2 optional.
@@ -62,34 +85,39 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         if test:
             X2, y2 = check_X_y(X2, y2)
 
-        self.fit(X1, y1)
+        if not skip_fit:
+            self.fit(X1, y1)
 
-        stuff = []
-        for cl, Z_cv in zip(self.cand_learners_, np.transpose(self.Z_train_cv_)):
-            stuff.append([type(cl).__name__,
-                          mean_squared_error(cl.predict(X1), y1),
-                          mean_squared_error(Z_cv, y1)]
-                         + ([mean_squared_error(cl.predict(X2), y2)] if test else []))
+        stuff = self.get_cand_stats(X1, y1, X2, y2)
 
-        stuff.append([f"Meta ({type(self.meta_learner_).__name__})",
-                      mean_squared_error(self.predict(X1), y1),
-                      mean_squared_error(self.meta_learner_.predict(self.Z_train_cv_), y1)]
-                     + ([mean_squared_error(self.predict(X2), y2)] if test else []))
+        stuff.append(self.get_meta_stats(X1, y1, X2, y2))
 
         df = pd.DataFrame(data=stuff, columns=["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if test else []))
         try:
             df["Coefs"] = self.meta_learner_.coef_.tolist() + [None]
         except:  # no coefs
             pass
-
         return df
+
+
+def try_super_learners(cands, metas, X1, y1, X2, y2):
+    sl = SuperLearner(cand_learners=cands)
+    sl.fit_cands(X1, y1)
+    Z = sl.Z_train_cv_
+    stats = sl.get_cand_stats(X1, y1, X2, y2)
+    for meta in metas:
+        sl.set_params(meta_learner=meta)
+        sl.fit_meta(Z, y1)
+        stats.append(sl.get_meta_stats(X1, y1, X2, y2))
+
+    df = pd.DataFrame(data=stats,
+                      columns=["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if X2 is not None else []))
+    return df
 
 
 class BMA(BaseEstimator, RegressorMixin):
     def __init__(self, cand_learners=[LinearRegression()]):
         self.cand_learners = cand_learners
-        self.weights_ = None
-        self.norm_test_ = None
 
     def fit(self, X, y):
         X, y = check_X_y(X, y)
@@ -125,10 +153,43 @@ class BMA(BaseEstimator, RegressorMixin):
             return self.norm_test_[:,0]
 
     def predict(self, X):
-        check_is_fitted(self, 'cand_learners')
+        check_is_fitted(self, 'weights_')
         X = check_array(X)
         y_hat = np.transpose([cl.predict(X) for cl in self.cand_learners_])
         return np.sum(y_hat * self.weights_, axis=1)
+
+    def debug(self, X1, y1, X2=None, y2=None, skip_fit=False):
+        """
+        Fits on X1, y1 and predicts on X2, y2 and returns a DataFrame of useful info.
+        X2, y2 optional.
+        """
+        X1, y1 = check_X_y(X1, y1)
+
+        test = X2 is not None or y2 is not None
+        if test:
+            X2, y2 = check_X_y(X2, y2)
+
+        if not skip_fit:
+            self.fit(X1, y1)
+
+        stuff = []
+        for cl in self.cand_learners_:
+            stuff.append([type(cl).__name__,
+                          mean_squared_error(cl.predict(X1), y1)]
+                         + ([mean_squared_error(cl.predict(X2), y2)] if test else []))
+
+        stuff.append(["BMA",
+                      mean_squared_error(self.predict(X1), y1)]
+                     + ([mean_squared_error(self.predict(X2), y2)] if test else []))
+
+        df = pd.DataFrame(data=stuff, columns=["Learner", "Train MSE"] + (["Test MSE"] if test else []))
+        try:
+            df["Coefs"] = self.weights_.tolist() + [None]
+            df["BIC"] = self.BIC_.tolist() + [None]
+        except:  # no coefs
+            pass
+
+        return df
 
 
 if __name__ == "__main__":
