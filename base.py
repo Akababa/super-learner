@@ -133,8 +133,8 @@ class BMA(BaseEstimator, RegressorMixin):
             eps = y - cand.predict(X)
             var_eps = np.var(eps) # this is sigma^2
             norm_test[i,] = stats.shapiro(eps)
-            ll_val = -n * np.log(2 * np.pi * var_eps) / 2 - n / 2 # simplified log likelihood
-            BIC[i] = 2*ll_val + (p + 2) * np.log(n)
+            ll_val = -0.5 * n * np.log(2 * np.pi * var_eps) - n / 2 # simplified log likelihood
+            BIC[i] = -2*ll_val + (p + 2) * np.log(n)
 
         # using log-sum-exp rule: https://www.xarg.org/2016/06/the-log-sum-exp-trick-in-machine-learning/
         logsum = max(-0.5*BIC) + np.log(np.sum(np.exp(-0.5*BIC - max(-0.5*BIC))))
