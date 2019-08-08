@@ -34,14 +34,10 @@ clf = SuperLearner(cand_learners=model_lib[0:9],
                    V=v_folds).fit(X_train, y_train)
 bma = BMA([ols, elnet, ridge, lars, lasso])
 bma.fit(X_train, y_train)
-print(bma.weights())
 print(bma.score(X_test, y_test))
-clf.debug(X_train, y_train, X_test, y_test)
+print(clf.debug(X_train, y_train, X_test, y_test))
 norm_pval = bma.norm_test(pval=True)
 
-print(clf.score(X_test, y_test))
 from sklearn.model_selection import cross_val_score
 
 scores = cross_val_score(clf, diabetes.data, diabetes.target, cv=KFold(n_splits=v_folds, random_state=seed2))
-print(scores)
-print(np.mean(scores))
