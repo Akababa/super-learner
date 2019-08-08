@@ -91,8 +91,11 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         stuff = self.get_cand_stats(X1, y1, X2, y2)
 
         stuff.append(self.get_meta_stats(X1, y1, X2, y2))
-
-        df = pd.DataFrame(data=stuff, columns=["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if test else []))
+        col_names = ["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if test else [])
+        df = pd.DataFrame(data=stuff, columns=col_names)
+        col_names.remove("Learner")
+        col_mins = df[col_names].min(axis=0)
+        df[col_names] = df[col_names]/col_mins
         try:
             df["Coefs"] = self.meta_learner_.coef_.tolist() + [None]
         except:  # no coefs
@@ -182,7 +185,11 @@ class BMA(BaseEstimator, RegressorMixin):
                       mean_squared_error(self.predict(X1), y1)]
                      + ([mean_squared_error(self.predict(X2), y2)] if test else []))
 
-        df = pd.DataFrame(data=stuff, columns=["Learner", "Train MSE"] + (["Test MSE"] if test else []))
+        col_names = ["Learner", "Train MSE"] + (["Test MSE"] if test else [])
+        df = pd.DataFrame(data=stuff, columns=col_names)
+        col_names.remove("Learner")
+        col_mins = df[col_names].min(axis=0)
+        df[col_names] = df[col_names]/col_mins
         try:
             df["Coefs"] = self.weights_.tolist() + [None]
             df["BIC"] = self.BIC_.tolist() + [None]
