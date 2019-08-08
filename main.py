@@ -34,8 +34,7 @@ clf = SuperLearner(cand_learners=model_lib[0:9],
                    V=v_folds).fit(X_train, y_train)
 bma = BMA([ols, elnet, ridge, lars, lasso])
 bma.fit(X_train, y_train)
-print(bma.score(X_test, y_test))
-print(clf.debug(X_train, y_train, X_test, y_test))
+print(bma.debug(X_train, y_train, X_test, y_test))
 norm_pval = bma.norm_test(pval=True)
 
 from sklearn.model_selection import cross_val_score

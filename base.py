@@ -100,6 +100,10 @@ class SuperLearner(BaseEstimator, RegressorMixin):
             df["Coefs"] = self.meta_learner_.coef_.tolist() + [None]
         except:  # no coefs
             pass
+        df = df.append(pd.Series(), ignore_index=True)
+        df.iloc[-1,0] = 'Min Error'
+        df.iloc[-1,1:len(col_mins)+1] = col_mins
+        df = df.round(4)
         return df
 
 
@@ -118,7 +122,10 @@ def try_super_learners(cands, metas, X1, y1, X2, y2):
     col_names.remove("Learner")
     col_mins = df[col_names].min(axis=0)
     df[col_names] = df[col_names] / col_mins
-
+    df = df.append(pd.Series(), ignore_index=True)
+    df.iloc[-1, 0] = 'Min Error'
+    df.iloc[-1, 1:len(col_mins) + 1] = col_mins
+    df = df.round(4)
     return df
 
 
@@ -200,6 +207,10 @@ class BMA(BaseEstimator, RegressorMixin):
         except:  # no coefs
             pass
 
+        df = df.append(pd.Series(), ignore_index=True)
+        df.iloc[-1,0] = 'Min Error'
+        df.iloc[-1,1:len(col_mins)+1] = col_mins
+        df = df.round(4)
         return df
 
 
