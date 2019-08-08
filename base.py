@@ -112,9 +112,13 @@ def try_super_learners(cands, metas, X1, y1, X2, y2):
         sl.set_params(meta_learner=meta)
         sl.fit_meta(Z, y1)
         stats.append(sl.get_meta_stats(X1, y1, X2, y2))
-
+    col_names = ["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if X2 is not None else [])
     df = pd.DataFrame(data=stats,
-                      columns=["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if X2 is not None else []))
+                      columns=col_names)
+    col_names.remove("Learner")
+    col_mins = df[col_names].min(axis=0)
+    df[col_names] = df[col_names] / col_mins
+
     return df
 
 
