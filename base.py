@@ -74,7 +74,7 @@ class SuperLearner(BaseEstimator, RegressorMixin):
                 mean_squared_error(self.meta_learner_.predict(self.Z_train_cv_), y1)] \
                + ([mean_squared_error(self.predict(X2), y2)] if X2 is not None else [])
 
-    def debug(self, X1, y1, X2=None, y2=None, skip_fit=False):
+    def debug(self, X1, y1, X2=None, y2=None, skip_fit=False, relative=False):
         """
         Fits on X1, y1 and predicts on X2, y2 and returns a DataFrame of useful info.
         X2, y2 optional.
@@ -93,21 +93,23 @@ class SuperLearner(BaseEstimator, RegressorMixin):
         stuff.append(self.get_meta_stats(X1, y1, X2, y2))
         col_names = ["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if test else [])
         df = pd.DataFrame(data=stuff, columns=col_names)
-        col_names.remove("Learner")
-        col_mins = df[col_names].min(axis=0)
-        df[col_names] = df[col_names]/col_mins
+        if relative:
+            col_names.remove("Learner")
+            col_mins = df[col_names].min(axis=0)
+            df[col_names] = df[col_names]/col_mins
         try:
-            df["Coefs"] = self.meta_learner_.coef_.tolist() + [None]
+            df["Coefs"] = self.meta_learner_.coef_.tolist() + [sum(self.meta_learner_.coef_)]
         except:  # no coefs
             pass
-        df = df.append(pd.Series(), ignore_index=True)
-        df.iloc[-1,0] = 'Min Error'
-        df.iloc[-1,1:len(col_mins)+1] = col_mins
+        if relative:
+            df = df.append(pd.Series(), ignore_index=True)
+            df.iloc[-1,0] = 'Min Error'
+            df.iloc[-1,1:len(col_mins)+1] = col_mins
         df = df.round(4)
         return df
 
 
-def try_super_learners(cands, metas, X1, y1, X2, y2):
+def try_super_learners(cands, metas, X1, y1, X2, y2,relative=False):
     sl = SuperLearner(cand_learners=cands)
     sl.fit_cands(X1, y1)
     Z = sl.Z_train_cv_
@@ -119,12 +121,13 @@ def try_super_learners(cands, metas, X1, y1, X2, y2):
     col_names = ["Learner", "Train MSE", "Train CV MSE"] + (["Test MSE"] if X2 is not None else [])
     df = pd.DataFrame(data=stats,
                       columns=col_names)
-    col_names.remove("Learner")
-    col_mins = df[col_names].min(axis=0)
-    df[col_names] = df[col_names] / col_mins
-    df = df.append(pd.Series(), ignore_index=True)
-    df.iloc[-1, 0] = 'Min Error'
-    df.iloc[-1, 1:len(col_mins) + 1] = col_mins
+    if relative:
+        col_names.remove("Learner")
+        col_mins = df[col_names].min(axis=0)
+        df[col_names] = df[col_names] / col_mins
+        df = df.append(pd.Series(), ignore_index=True)
+        df.iloc[-1, 0] = 'Min Error'
+        df.iloc[-1, 1:len(col_mins) + 1] = col_mins
     df = df.round(4)
     return df
 
@@ -172,7 +175,7 @@ class BMA(BaseEstimator, RegressorMixin):
         y_hat = np.transpose([cl.predict(X) for cl in self.cand_learners_])
         return np.sum(y_hat * self.weights_, axis=1)
 
-    def debug(self, X1, y1, X2=None, y2=None, skip_fit=False):
+    def debug(self, X1, y1, X2=None, y2=None, skip_fit=False, relative=False):
         """
         Fits on X1, y1 and predicts on X2, y2 and returns a DataFrame of useful info.
         X2, y2 optional.
@@ -198,18 +201,19 @@ class BMA(BaseEstimator, RegressorMixin):
 
         col_names = ["Learner", "Train MSE"] + (["Test MSE"] if test else [])
         df = pd.DataFrame(data=stuff, columns=col_names)
-        col_names.remove("Learner")
-        col_mins = df[col_names].min(axis=0)
-        df[col_names] = df[col_names]/col_mins
+        if relative:
+            col_names.remove("Learner")
+            col_mins = df[col_names].min(axis=0)
+            df[col_names] = df[col_names]/col_mins
         try:
-            df["Coefs"] = self.weights_.tolist() + [None]
+            df["Coefs"] = self.weights_.tolist() + [sum(self.weights_)]
             df["BIC"] = self.BIC_.tolist() + [None]
         except:  # no coefs
             pass
-
-        df = df.append(pd.Series(), ignore_index=True)
-        df.iloc[-1,0] = 'Min Error'
-        df.iloc[-1,1:len(col_mins)+1] = col_mins
+        if relative:
+            df = df.append(pd.Series(), ignore_index=True)
+            df.iloc[-1,0] = 'Min Error'
+            df.iloc[-1,1:len(col_mins)+1] = col_mins
         df = df.round(4)
         return df
 
