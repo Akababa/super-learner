@@ -42,7 +42,6 @@ class SuperLearner(BaseEstimator, RegressorMixin):
     def fit(self, X, y):
         # steps 0-3: fit candidate learners
         Z = self.fit_cands(X, y)
-
         # step 4: fit meta learner
         self.fit_meta(Z, y)
 
