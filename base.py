@@ -146,10 +146,10 @@ class BMA(BaseEstimator, RegressorMixin):
         for cand, i in zip(self.cand_learners_, range(k)):
             cand.fit(X, y)
             # https://www.ssc.wisc.edu/~bhansen/718/NonParametrics15.pdf
-            eps = y - cand.predict(X)
-            var_eps = np.var(eps) # this is sigma^2
-            norm_test[i,] = stats.shapiro(eps)
-            ll_val = -0.5 * n * np.log(2 * np.pi * var_eps) - n / 2 # simplified log likelihood
+            e_i = y - cand.predict(X)
+            var_e_i = np.var(e_i) # this is hat sigma^2
+            norm_test[i,] = stats.shapiro(e_i)
+            ll_val = -0.5 * n * np.log(2 * np.pi * var_e_i) - n / 2 # simplified log likelihood
             BIC[i] = -2*ll_val + (p + 2) * np.log(n)
 
         # using log-sum-exp rule: https://www.xarg.org/2016/06/the-log-sum-exp-trick-in-machine-learning/
@@ -215,6 +215,22 @@ class BMA(BaseEstimator, RegressorMixin):
             df.iloc[-1,1:len(col_mins)+1] = col_mins
         df = df.round(4)
         return df
+
+def gbm_summary(gbm, X1, y1, X2=None, y2=None):
+    gbm.fit(X1,y1)
+    test = X2 is not None or y2 is not None
+    if test:
+        X2, y2 = check_X_y(X2, y2)
+    stuff = []
+    stuff.append(["Gradient Boosting",
+                  mean_squared_error(gbm.predict(X1), y1)]
+                 + ([mean_squared_error(gbm.predict(X2), y2)] if test else []))
+    col_names = ["Learner", "Train MSE"]  + (["Test MSE"] if test else [])
+    params = pd.DataFrame.from_dict(gbm.best_params_,orient='index')
+    print(params)
+    df = pd.DataFrame(data=stuff, columns=col_names)
+    df = df.round(4)
+    return df
 
 
 if __name__ == "__main__":
